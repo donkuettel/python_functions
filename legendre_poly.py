@@ -28,7 +28,7 @@ def legendre_poly(l, m, x):
         print('ERROR: max(l) = 20 and max(m) = 20')
 
     if l == 0 and m == 0:
-        P = 1.00000000000000
+        P = 1.0
     elif l == 1 and m == 0:
         P = 1.0*x
     elif l == 1 and m == 1:

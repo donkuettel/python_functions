@@ -10,26 +10,26 @@ AUTHOR:
     Don Kuettel <don.kuettel@gmail.com>
     Univeristy of Colorado-Boulder - ORCCA
 
-    1) cart2kep (Cartesian Elements --> Keplerian Orbital Elements)
-    2) kep2cart (Keplerian Orbital Elements --> Cartesian Elements)
-    3) oe2equ (Classical Elements --> Modified Mquinoctial Elements)
-    4) equ2oe (Modified Mquinoctial Elements --> Classical Elements)
-    5) true2mean (True Anomaly --> Eccentric and Mean Anomaly)
-    6) mean2true (Mean Anomaly --> Eccentric and True Anomaly)
-    7) hohmann (Find dVs necessary for Hohmann Transfer)
-    8) theta_gst (Find theta_GST from Julian Date)
-    9) julian_date (Finds Julian Date from Gregorian Date)
-   10) gregorian_date (Finds Gregorian Date from Julian Date)
-   11) ymd2dayofyear (year/month/day hr:min:sec --> day of year)
-   12) dayofyear2ymd (day of year --> year/month/day hr:min:sec)
-   13) circ_rendez (computes rendez of two sc in same circular orbit)
-   14) hill_eqns (determining proximity motion of two s/c)
-   15) hill_rendez (finds dV necessary to return to reference s/c)
-   16) fpa (find flight path angle)
-   17) meeus (find orbital elements of planets with JD)
-   18) lambert_uv (universal variables lambert problem solver)
-   19) lambert_PC (Prussing and Conway lambert problem solver)
-   20) lambert_uv_multirev (multirev lambert problem solver)
+    1) rv2oe (Cartesian Elements --> Keplerian Orbital Elements)
+    2) oe2rv (Keplerian Orbital Elements --> Cartesian Elements)
+    3) oe2meoe (Classical Elements --> Modified Equinoctial Elements)
+    4) meoe2oe (Modified Equinoctial Elements --> Classical Elements)
+    5) rv2meoe (Cartesian Elements --> Modified Equinoctial Elements)
+    6) meoe2rv (Modified Equinoctial Elements --> Cartesian Elements)
+    7) true2mean (True Anomaly --> Eccentric and Mean Anomaly)
+    8) mean2true (Mean Anomaly --> Eccentric and True Anomaly)
+    9) hohmann (Find dVs necessary for Hohmann Transfer)
+   10) theta_gst (Find theta_GST from Julian Date)
+   11) julian_date (Finds Julian Date from Gregorian Date)
+   12) gregorian_date (Finds Gregorian Date from Julian Date)
+   13) ymd2dayofyear (year/month/day hr:min:sec --> day of year)
+   14) dayofyearfymd (day of year --> year/month/day hr:min:sec)
+   15) circ_rendez (computes rendez of two sc in same circular orbit)
+   16) hill_eqns (determining proximity motion of two s/c)
+   17) hill_rendez (finds dV necessary to return to reference s/c)
+   18) fpa (find flight path angle)
+   19) meeus (find orbital elements of planets with JD)
+   20) BdtBdR (determining B-Plane Components)
 """
 
 # Import Modules
@@ -40,7 +40,7 @@ from scipy.optimize import fsolve
 # Define Functions
 # =====================================================================
 # 1) 
-def cart2kep(r, v, mu=c.mu_earth):
+def rv2oe(r, v, mu=c.mu_earth):
     """This function takes the cartesian orbital elements of a 
     spacecraft (x, y, z, vx, vy, vz) and returns the Kepler orbital 
     elements (a, e, i, RAAN, w, nu).
@@ -105,6 +105,8 @@ def cart2kep(r, v, mu=c.mu_earth):
         raan = 2*np.pi - np.arccos(line_nodes[0]/line_nodes_mag)
 
     # Computing Argument of Periapse
+    # print(line_nodes)
+    # print(e_vec)
     if e_vec[-1] >= 0:
         w = np.arccos(np.dot(line_nodes, e_vec)/(line_nodes_mag*e))
     else:
@@ -149,7 +151,7 @@ def cart2kep(r, v, mu=c.mu_earth):
             w = w_true
             # print("Elliptical equatorial Orbit: w = w_true")
 
-    # If w is undefined (circular orbits)
+    # If w is undefined (circular orbits or equitorial orbit)
     if np.isnan(w) == True and np.isnan(raan) == False:
     # if abs(e) < 1e-6:
         if r[-1] >= 0:
@@ -164,15 +166,8 @@ def cart2kep(r, v, mu=c.mu_earth):
         # print("Circular Orbit: nu = u")
 
     # Computing Mean Anomaly
-    cos_ea = (r_mag*np.cos(nu) + a*e)/a
-    sin_ea = r_mag*np.sin(nu)/(a*np.sqrt(1 - e*e))
-    ea = np.arctan2(sin_ea, cos_ea)
-
-    if ea < 0:
-        ea += 2*np.pi
-
-    ma = ea - e*np.sin(ea)
-    n = np.sqrt(mu/a/a/a)                     # 1/sec
+    ma, ea = true2mean(nu, a, e)
+    n = np.sqrt(mu/abs(a)**3)                     # 1/sec
     d_tp = ma/n                               # sec
     
     oe = [a, e, inc, raan, w, nu]
@@ -183,7 +178,7 @@ def cart2kep(r, v, mu=c.mu_earth):
 
 # =====================================================================
 # 2) 
-def kep2cart(oe, mu=c.mu_earth):
+def oe2rv(oe, mu=c.mu_earth):
     """This function takes the Kepler orbital elements (a, e, i, RAAN,
     w, nu) of a spacecraft and returns the cartesian orbital elements 
     (x, y, z, vx, vy, vz).
@@ -192,7 +187,7 @@ def kep2cart(oe, mu=c.mu_earth):
     - keplarian motion
 
     INPUT:
-        a - semimajor axis of orbit in [km]
+        a - semimajor axis of orbit in [m]
         e - eccintricity of the spacecraft 0<e<1
         i - inclination of the spacecraft 0<i<pi [rad]
         w - argument of periapsis of the spacecraft 0<i<2*pi [rad]
@@ -200,19 +195,19 @@ def kep2cart(oe, mu=c.mu_earth):
                spacecraft 0<raan<2*pi [rad]
         nu - true anomaly 0<nu<2*pi [rad]
         mu - gravitational parameter of planet (assumed to be Earth) 
-             in [km^3/s^2]
+             in [m^3/s^2]
 
     OUTPUT:
-        r - [x, y, z] np.array position vector of sc in [km]
-        v - [vx, vy, vz] np.array velocity vector of sc in [km/s]
+        r - [x, y, z] np.array position vector of sc
+        v - [vx, vy, vz] np.array velocity vector of sc
 
         Where:
-            x - x-position of the spacecraft in [km]
-            y - y-position of the spacecraft in [km]
-            z - z-position of the spacecraft in [km]
-            vx - x-direction velocity of the spacecraft in [km/s]
-            vy - y-direction velocity of the spacecraft in [km/s]
-            vz - z-direction velocity of the spacecraft in [km/s]
+            x - x-position of the spacecraft
+            y - y-position of the spacecraft
+            z - z-position of the spacecraft
+            vx - x-direction velocity of the spacecraft
+            vy - y-direction velocity of the spacecraft
+            vz - z-direction velocity of the spacecraft
     """
 
     # classical elements
@@ -223,14 +218,14 @@ def kep2cart(oe, mu=c.mu_earth):
 
     # Rotation Matrices
     R3_w = np.array([[np.cos(w), -np.sin(w), 0], 
-                     [np.sin(w), np.cos(w), 0], 
+                     [np.sin(w), np.cos(w),  0], 
                      [0, 0, 1]])
     R1_inc = np.array([[1, 0, 0], 
                        [0, np.cos(inc), -np.sin(inc)], 
                        [0, np.sin(inc), np.cos(inc)]])
     R3_raan = np.array([[np.cos(raan), -np.sin(raan), 0],
                         [np.sin(raan), np.cos(raan), 0], 
-                         [0, 0, 1]])
+                        [0, 0, 1]])
 
     # Position and Velocity Vectors
     r_pqw = np.array([r_mag*np.cos(nu), r_mag*np.sin(nu), 0])
@@ -246,7 +241,7 @@ def kep2cart(oe, mu=c.mu_earth):
 
 # ===================================================================
 # 3)
-def oe2equ(oe):
+def oe2meoe(oe):
     """This function converts the classical orbital elements to the
     modified equinoctial elements
 
@@ -263,7 +258,7 @@ def oe2equ(oe):
             nu: true anomaly
 
     OUTPUT:
-        equ - a 6x1 array of the modified equinoctial elements
+        meoe - a 6x1 array of the modified equinoctial elements
             p: semilatus rectum
             f: X-component of eccentricity vector in EQU frame
             g: Y-component of eccentricity vector in EQU frame
@@ -283,15 +278,18 @@ def oe2equ(oe):
     k = np.tan(inc/2)*np.sin(raan)
     L = raan + w + nu
 
-    equ = [p, f, g, h, k, L]
+    if L > 2*np.pi:
+        L = L % (2*np.pi)
 
-    return equ
+    meoe = np.array([p, f, g, h, k, L])
+
+    return meoe
 # ===================================================================
 
 
 # ===================================================================
 # 4)
-def equ2oe(equ):
+def meoe2oe(meoe):
     """This function converts the classical orbital elements to the
     modified equinoctial elements
 
@@ -299,7 +297,8 @@ def equ2oe(equ):
         -keplerian dynamics
         
     INPUT:
-        p: semilatus rectum
+        meoe - a 6x1 array of the modified equinoctial elements
+            p: semilatus rectum
             f: X-component of eccentricity vector in EQU frame
             g: Y-component of eccentricity vector in EQU frame
             h: X-component of ascending node vector in EQU frame
@@ -317,7 +316,7 @@ def equ2oe(equ):
     """
 
     # equinoctial elements
-    p, f, g, h, k, L = equ
+    p, f, g, h, k, L = meoe
 
     # classical elements
     a = p/(1 - f*f - g*g)
@@ -332,8 +331,8 @@ def equ2oe(equ):
     if raan < 0:
         raan += 2*np.pi
     
-    sin_w = (g*h - f*k)/e*np.tan(inc/2)
-    cos_w = (f*h + g*k)/e*np.tan(inc/2)
+    sin_w = (g*h - f*k)/e/np.tan(inc/2)
+    cos_w = (f*h + g*k)/e/np.tan(inc/2)
     w = np.arctan2(sin_w, cos_w)
     if w < 0:
         w += 2*np.pi
@@ -344,14 +343,66 @@ def equ2oe(equ):
     if nu < 0:
         nu += 2*np.pi
     
-    eo = [a, e, inc, raan, w, nu]
+    eo = np.array([a, e, inc, raan, w, nu])
 
     return eo
 # ===================================================================
 
+# ===================================================================
+# 5)
+def rv2meoe(r, v, mu=c.mu_earth):
+    """This function converts the Cartesian elements to the
+    modified equinoctial elements
+
+    ASSUMPTIONS: 
+        -keplerian dynamics
+        
+    INPUT:
+        r - [x, y, z] np.array position vector of sc
+        v - [vx, vy, vz] np.array velocity vector of sc
+        mu - gravitaitonal parameter of body
+
+    OUTPUT:
+        meoe - a 6x1 array of the modified equinoctial elements
+            p: semilatus rectum
+            f: X-component of eccentricity vector in EQU frame
+            g: Y-component of eccentricity vector in EQU frame
+            h: X-component of ascending node vector in EQU frame
+            k: Y-component of ascending node vector in EQU frame
+            L: True longitude
+    """
+    return oe2meoe(rv2oe(r,v,mu=mu)[0])
+# ===================================================================
+
+
+# ===================================================================
+# 6)
+def meoe2rv(meoe, mu=c.mu_earth):
+    """This function converts the classical orbital elements to the
+    modified equinoctial elements
+
+    ASSUMPTIONS: 
+        -keplerian dynamics
+        
+    INPUT:
+        meoe - a 6x1 array of the modified equinoctial elements
+            p: semilatus rectum
+            f: X-component of eccentricity vector in EQU frame
+            g: Y-component of eccentricity vector in EQU frame
+            h: X-component of ascending node vector in EQU frame
+            k: Y-component of ascending node vector in EQU frame
+            L: True longitude
+
+    OUTPUT:
+        r - [x, y, z] np.array position vector of sc
+        v - [vx, vy, vz] np.array velocity vector of sc
+    """
+    return oe2rv(meoe2oe(meoe), mu=mu)
+# ===================================================================
+
 
 # =====================================================================
-# 5) 
+# 7) 
 def true2mean(nu, a, e):
     """This function takes the true anomaly, semimajor axis, and 
     eccentricity of an orbit and returns the eccentric and mean 
@@ -367,25 +418,38 @@ def true2mean(nu, a, e):
         ma - mean anomaly 0<ma<2*pi [rad]
     """
 
-    r_mag = a*(1 - e*e)/(1 + e*np.cos(nu))
+    if e >= 1:
+        # cosh_ea = ((e + np.cos(nu))/(1 + e*np.cos(nu)))
+        # ea = np.log(cosh_ea + np.sqrt(cosh_ea*cosh_ea - 1))
+        # sinh_ea = (np.exp(ea) - np.exp(-ea))/2
 
-    # Computing Eccentric Anomaly
-    cos_ea = (r_mag*np.cos(nu) + a*e)/a
-    sin_ea = r_mag*np.sin(nu)/(a*np.sqrt(1 - e*e))
-    ea = np.arctan2(sin_ea, cos_ea)
+        """This is what Vallado recommends (sinh is not double 
+        valued and therefore doesn't require a quandrant check"""
+        sinh_ea = (np.sin(nu)*np.sqrt(e*e-1))/(1 + e*np.cos(nu))
+        ea = np.arcsinh(sinh_ea)
 
-    if ea < 0:
-        ea += 2*np.pi
+        ma = e*sinh_ea - ea
 
-    # Computing Mean Anomaly
-    ma = ea - e*np.sin(ea)
+    else:
+        r_mag = a*(1 - e*e)/(1 + e*np.cos(nu))
+    
+        # Computing Eccentric Anomaly
+        cos_ea = (r_mag*np.cos(nu) + a*e)/a
+        sin_ea = r_mag*np.sin(nu)/(a*np.sqrt(1 - e*e))
+        ea = np.arctan2(sin_ea, cos_ea)
+    
+        if ea < 0:
+            ea += 2*np.pi
+    
+        # Computing Mean Anomaly
+        ma = ea - e*np.sin(ea)
 
     return ma, ea
 # =====================================================================
 
 
 # =====================================================================
-# 6) 
+# 8) 
 def mean2true(ma, a, e, tol=1e-12, timeout=200):
     """This function takes the mean anomaly, semimajor axis, and 
     eccentricity of an orbit and returns the eccentric and true 
@@ -441,7 +505,7 @@ def mean2true(ma, a, e, tol=1e-12, timeout=200):
 
 
 # =====================================================================
-# 7) 
+# 9) 
 def hohmann(a_in, a_fin, r_in, r_fin, mu=c.mu_earth):
     """This function finds a Hohmann transfer between two points on 
     two planar orbits.
@@ -482,7 +546,7 @@ def hohmann(a_in, a_fin, r_in, r_fin, mu=c.mu_earth):
 
 
 # =====================================================================
-# 8) 
+# 10) 
 def theta_gst(jd):
     """This function calculates theta_GST for Earth for a given 
     Julian Date.
@@ -516,7 +580,7 @@ def theta_gst(jd):
 
 
 # =====================================================================
-# 9) 
+# 11) 
 def julian_date(yr, mo, d, hr, m, s):
     """This function take the Gregorian Date of a specific date 
     between March 1st, 1900 and February 28th, 2100 and returns 
@@ -543,7 +607,7 @@ def julian_date(yr, mo, d, hr, m, s):
 
 
 # =====================================================================
-# 10) 
+# 12) 
 def gregorian_date(jd):
     """This function take the Julian Date of a specific date between 
     March 1st, 1900 and February 28th, 2100 and returns the Gregorian 
@@ -593,7 +657,7 @@ def gregorian_date(jd):
     m = np.floor((tow - hr) * 60)
     s = (tow - hr - m / 60) * 3600
 
-    date = (str(int(mon)) + '/' + str(int(d)) + '/' + str(int(yr)) 
+    date = str(int(yr)) + '/' + (str(int(mon)) + '/' + str(int(d)) 
            + ' ' + str(int(hr)) + ':' + str(int(m)) + ':' + str(s))
 
     return date
@@ -601,7 +665,7 @@ def gregorian_date(jd):
 
 
 # =====================================================================
-# 11) 
+# 13) 
 def ymd2dayofyear(yr, mon, d, hr, m, s):
     """The function take the date and returns the day of the year 
     in decimal form.
@@ -636,8 +700,8 @@ def ymd2dayofyear(yr, mon, d, hr, m, s):
 
 
 # =====================================================================
-# 12) 
-def dayofyear2ymd(days, yr):
+# 14) 
+def dayofyearfymd(days, yr):
     """The function take the day of the year and returns the month, 
     day, hour, minute, and second.
 
@@ -681,7 +745,7 @@ def dayofyear2ymd(days, yr):
 
 
 # =====================================================================
-# 13) 
+# 15) 
 def circ_redez(a_target, theta, r_body=c.r_earth, mu=c.mu_earth, 
     k_target=1, k_int=1):
     """This function compute the rendezvous between two satellits in 
@@ -739,7 +803,7 @@ def circ_redez(a_target, theta, r_body=c.r_earth, mu=c.mu_earth,
 
 
 # ===================================================================== 
-# 14)
+# 16)
 def hill_eqns(xi, yi, zi, vxi, vyi, vzi, n, dt):
     """This function is used for close proximity determination. The 
     CW/Hill equations are used to determine the position of a 
@@ -795,7 +859,7 @@ def hill_eqns(xi, yi, zi, vxi, vyi, vzi, n, dt):
 
 
 # =====================================================================
-# 15) 
+# 17) 
 def hill_rendez(xi, yi, zi, vxi, vyi, vzi, n, dt):
     """This function is used for close proximity determination. The 
     CW/Hill equations are used to determine the velocity needed to 
@@ -847,7 +911,7 @@ def hill_rendez(xi, yi, zi, vxi, vyi, vzi, n, dt):
 
 
 # =====================================================================
-# 16) 
+# 18) 
 def fpa(e, nu):
     """ This function calculates the flight path angle for an 
     elliptical orbit.
@@ -870,9 +934,9 @@ def fpa(e, nu):
 
 
 # =====================================================================
-# 17) 
+# 19) 
 def meeus(JD, planet):
-    """ This function calculates the position and velocity of 
+    """ This function calculates the orbital elements of the
     planets wrt sun.
 
     INPUT:
@@ -897,37 +961,37 @@ def meeus(JD, planet):
 
     """
 
-    # # Mercury
-    # if planet.lower() == 'mercury':
-    #     a0_L = 
-    #     a1_L = 
-    #     a2_L = 
-    #     a3_L = 
+    # Mercury
+    if planet.lower() == 'mercury':
+        a0_L = 252.250906
+        a1_L = 149474.0722491
+        a2_L = 0.00030350
+        a3_L = 0.000000018
     
-    #     a0_a = 
-    #     a1_a = 
-    #     a2_a = 
-    #     a3_a = 
+        a0_a = 0.387098310
+        a1_a = 0
+        a2_a = 0
+        a3_a = 0
     
-    #     a0_e = 
-    #     a1_e = 
-    #     a2_e = 
-    #     a3_e = 
+        a0_e = 0.20563175
+        a1_e = 0.000020407
+        a2_e = -0.0000000283
+        a3_e = -0.00000000018
     
-    #     a0_inc = 
-    #     a1_inc = 
-    #     a2_inc = 
-    #     a3_inc = 
+        a0_inc = 7.004986
+        a1_inc = 0.0018215
+        a2_inc = -0.00001810
+        a3_inc = 0.000000056
     
-    #     a0_RAAN = 
-    #     a1_RAAN = 
-    #     a2_RAAN = 
-    #     a3_RAAN = 
+        a0_RAAN = 48.330893
+        a1_RAAN = 1.1861883
+        a2_RAAN = 0.00017542
+        a3_RAAN = 0.000000215
     
-    #     a0_PI = 
-    #     a1_PI = 
-    #     a2_PI = 
-    #     a3_PI = 
+        a0_PI = 77.456119
+        a1_PI = 1.5564776
+        a2_PI = 0.00029544
+        a3_PI = 0.000000009
 
     # Venus
     if planet.lower() == 'venus':
@@ -1227,558 +1291,57 @@ def meeus(JD, planet):
     w = np.mod(w, 2*np.pi)
     nu = np.mod(nu, 2*np.pi)
 
-    return a, e, inc, RAAN, w, nu
+    return [a, e, inc, RAAN, w, nu]
 # =====================================================================
-
-
-# =====================================================================
-# 18) 
-def lambert_uv(r0, rf, dt, DM=1, mu=c.mu_sun):
-    """This function solves the 0-rev lambert problem using the 
-    Universal Variables Lambert Algorithm
-
-    INPUT:
-        r0 - initial position vector [km]
-        rf - final position vector [km]
-        dt - time of flight [sec]
-        DM - direction of motion
-                 0 - calculate DM based on the assumption that 
-                     both orbits are in the equatorial plane
-                +1 - short way
-                -1 - long way
-        mu - gravitational parameter of central body 
-             (default is sun) [km^3/s^2]
-
-    OUTPUT:
-        v0 - velocity at r0 [km/s]
-        vf - velocity at rf [k/s]
-        psi_n - value of psi converged
-        orb_type - type I/II converged
-    """
-    
-    # Tolerances
-    tol_psi = 1e-6
-    tol_dt = 1e-6
-
-    # Function Checks
-    run = True
-    check_dt = 0
-    check_traj = 0
-
-    # Check Transfer Time
-    if dt < 0:
-        print('ERROR: Transfer Time is Negative')
-        check_dt = 1
-
-    # Calculating direction of motion
-    if DM == 1:
-        # Short way
-        orb_type = 1
-
-    elif DM == -1:
-        # Long way
-        orb_type = 2
-
-    else:
-        # This only works if both orbits are mostly in the xy-plane
-        # such as the case for IMD
-
-        # Calculating delta_nu
-        nu1 = np.arctan2(r0[1], r0[0])
-        if nu1 < 0:
-            nu1 += 2*np.pi
-    
-        nu2 = np.arctan2(rf[1], rf[0])
-        if nu2 < 0:
-            nu2 += 2*np.pi
-    
-        delta_nu = nu2 - nu1
-        if delta_nu < 0:
-            delta_nu += 2*np.pi
-    
-        # DM = Direction of Motion (+1 short way, -1 longway)
-        # Direction of motion dictated by delta_nu
-        if delta_nu > np.pi:
-            DM = -1
-            orb_type = 2
-        else:
-            DM = 1
-            orb_type = 1
-
-    # Intializing
-    r0_mag = np.sqrt(r0.dot(r0))
-    rf_mag = np.sqrt(rf.dot(rf))
-    
-    cos_delnu = np.dot(r0, rf)/abs(r0_mag*rf_mag)
-    A = DM*np.sqrt(r0_mag*rf_mag*(1.0 + cos_delnu))
-
-    c2 = 1/2.0
-    c3 = 1/6.0
-
-    # Checking possibility of trajectory
-    if np.arccos(cos_delnu) == 0 or A == 0:
-        print('ERROR: No Possible Lambert Trajectories')
-        check_traj = 1
-
-    # Setting initia PSI
-    psi_high = 4*np.pi*np.pi
-    psi_low = -4*np.pi
-    psi_n = 0
-
-    if check_dt == 0 and check_traj == 0:
-        loop_count = 0
-        
-        while run:
-            loop_count += 1
-    
-            if loop_count == 1000:
-                # print 'WARNING: Tolerance increased to 1e-5'
-                tol_dt = 1e-5
-            elif loop_count == 10000:
-                # print 'WARNING: Tolerance increased to 1e-4'
-                tol_dt = 1e-4
-            elif loop_count == 30000:
-                # print 'WARNING: Tolerance increased to 1e-3'
-                tol_dt = 1e-3
-            elif loop_count == 60000:
-                # print 'WARNING: Tolerance increased to 1e-2'
-                tol_dt = 1e-2
-            elif loop_count == 100000:
-                print('ERROR: No Convergence for TOF')
-                v0 = np.float('NaN')
-                vf = np.float('NaN')
-                psi_n = np.float('NaN')
-                break
-    
-            y = r0_mag + rf_mag + A*(psi_n*c3 - 1.0)/np.sqrt(c2)
-    
-            # readjusting psi_low until y > 0
-            if A > 0 and y < 0:
-                while y < 0:
-                    psi_n += 0.1
-                    y = (r0_mag + rf_mag + 
-                        A*(psi_n*c3 - 1.0)/np.sqrt(c2))
-    
-            Xi = np.sqrt(y/c2)
-            dt_n = ((Xi**3.0)*c3 + A*np.sqrt(y))/np.sqrt(mu)
-    
-            if dt_n <= dt: 
-                psi_low = psi_n
-            else:
-                psi_high = psi_n
-            
-            psi_n = (psi_low + psi_high)/2.0
-
-            if psi_n > tol_psi:
-                c2 = (1.0 - np.cos(np.sqrt(psi_n)))/psi_n
-                c3 = ((np.sqrt(psi_n) - 
-                    np.sin(np.sqrt(psi_n)))/np.sqrt(psi_n**3.0))
-            elif psi_n < -tol_psi:
-                c2 = (1.0 - np.cosh(np.sqrt(-psi_n)))/psi_n
-                c3 = ((np.sinh(np.sqrt(-psi_n)) - 
-                    np.sqrt(-psi_n))/np.sqrt((-psi_n)**3.0))
-            else:
-                c2 = 1/2.0
-                c3 = 1/6.0
-    
-            if abs(dt_n - dt) < tol_dt:
-                break
-    
-        f = 1.0 - y/r0_mag
-        gdot = 1.0 - y/rf_mag
-        g = A*np.sqrt(y/mu)
-    
-        v0 = (rf - f*r0)/g
-        vf = (gdot*rf - r0)/g
-    
-    else:
-        print("Lambert did not work")
-        v0 = float('NaN')
-        vf = float('NaN')
-        psi_n = float('NaN')
-
-    return v0, vf, psi_n, orb_type
-# =====================================================================
-
-
-# =====================================================================
-# 19) 
-
-def lambert_pc(r0, rf, dt, DM=1, mu=c.mu_sun):
-    """This function solves the 0-rev lambert problem using the 
-    method given by Prussing and Conway. 
-
-    INPUT:
-        r0 - initial position vector [km]
-        rf - final position vector [km]
-        dt - time of flight [sec]
-        DM - direction of motion
-                 0 - calculate DM based on the assumption that 
-                     both orbits are in the equatorial plane
-                +1 - short way
-                -1 - long way
-        mu - gravitational parameter of central body 
-             (default is sun) [km^3/s^2]
-
-    OUTPUT:
-        v0 - velocity at r0 [km/s]
-        vf - velocity at rf [km/s]
-        alpha - parameter
-        beta - parameter
-        a_solve - semimajor axis of transfer orbit [km]
-
-    SUPPORTING FUNCTIONS:
-        f1 - time equation used to determine SMA of transfer orbit
-        f2 - time equation used to determine SMA of transfer orbit
-             shifted by 2pi
-    """
-
-    # Function Checks
-    check_dt = 0
-
-    # Calculating direction of motion
-    if DM == 1:
-        # Short way
-        orb_type = 1
-
-    elif DM == -1:
-        # Long way
-        orb_type = 2
-
-    else:
-        # This only works if both orbits are mostly in the xy-plane
-        # such as the case for IMD
-
-        # Calculating delta_nu
-        nu1 = np.arctan2(r0[1], r0[0])
-        if nu1 < 0:
-            nu1 += 2*np.pi
-    
-        nu2 = np.arctan2(rf[1], rf[0])
-        if nu2 < 0:
-            nu2 += 2*np.pi
-    
-        delta_nu = nu2 - nu1
-        if delta_nu < 0:
-            delta_nu += 2*np.pi
-    
-        # DM = Direction of Motion (+1 short way, -1 longway)
-        # Direction of motion dictated by delta_nu
-        if delta_nu > np.pi:
-            DM = -1
-            orb_type = 2
-        else:
-            DM = 1
-            orb_type = 1
-
-    # Position vector magnitudes
-    r0_mag = np.sqrt(r0.dot(r0))
-    rf_mag = np.sqrt(rf.dot(rf))
-
-    # Comupte chord length
-    c_vec = rf - r0
-    c = np.sqrt(c_vec.dot(c_vec))
-
-    # Compute space triangle semi-parameter
-    s = 0.5*(r0_mag + rf_mag + c)
-
-    # Compute desired transfer angle
-    theta = np.arccos(np.dot(r0, rf)/abs(r0_mag*rf_mag))
-    if DM == -1:
-        theta = 2*np.pi - theta
-
-    # Check to make sure dt allows for an elliptic transfer
-    dt_parabolic = np.sqrt(2)/3/np.sqrt(mu)*(s**(3/2) - 
-        np.sign(np.sin(theta))*(s - c)**(3/2))
-    if dt <= dt_parabolic:
-        print('ERROR: This function only works on ellitpical orbits. Transfer time requires a hyperbolic orbit.')
-        check_dt = 1
-
-    if check_dt == 0:
-        # Choose sign for beta based on theta
-        if theta < np.pi:
-            betasign = 1
-        else:
-            betasign = -1
-
-        # Calculate minimum SMA axis and associated transfer time
-        a_min = s/2
-        beta_min = 2*np.arcsin(np.sqrt((s - c)/s))
-        t_min = np.sqrt(s*s*s/8/mu)*(np.pi - betasign*beta_min + np.sin(betasign*beta_min))
-        if dt <= t_min:
-            fun = f1
-        else:
-            fun = f2
-
-        data = [c, s, betasign, dt, mu]
-        a_solve = fsolve(fun, a_min, args=data)
-
-        if dt <= t_min:
-            alpha = 2*np.arcsin(np.sqrt(s/2/a_solve))
-        else:
-            alpha = 2*np.pi - 2*np.arcsin(np.sqrt(s/2/a_solve))
-
-        beta = betasign*2*np.arcsin(np.sqrt((s - c)/2/a_solve))
-
-        # Solve for terminal velocites
-        u1 = r0/r0_mag
-        u2 = rf/rf_mag
-        uc = c_vec/c 
-
-        temp = np.sqrt(mu/4/a_solve)
-        A = temp/np.tan(alpha/2)
-        B = temp/np.tan(beta/2)
-
-        v0 = (B + A)*uc + (B - A)*u1
-        vf = (B + A)*uc - (B - A)*u2
-
-    return v0, vf, alpha, beta, a_solve
-
-# Supporting Functions
-def f1(a, data):
-    c, s, betasign, dt, mu = data
-    return a**(3/2)/np.sqrt(mu)*(2*np.arcsin(np.sqrt(s/2/a)) - 
-        betasign*2*np.arcsin(np.sqrt((s - c)/2/a)) - 
-        (np.sin(2*np.arcsin(np.sqrt(s/2/a))) - 
-        np.sin(betasign*2*np.arcsin(np.sqrt((s - c)/2/a))))) - dt
-
-def f2(a, data):
-    c, s, betasign, dt, mu = data
-    return a**(3/2)/np.sqrt(mu)*(2*np.pi - 2*np.arcsin(np.sqrt(s/2/a)) - 
-        betasign*2*np.arcsin(np.sqrt((s - c)/2/a)) - 
-        (np.sin(2*np.pi - 2*np.arcsin(np.sqrt(s/2/a))) - 
-        np.sin(betasign*2*np.arcsin(np.sqrt((s - c)/2/a))))) - dt
-# =====================================================================
-
 
 # =====================================================================
 # 20)
-def lambert_multirev(r0, rf, dt, type, DM=1, mu=c.mu_sun):
-    """ This function solves the lambert problem using the Universal 
-    Variables Lambert Algorithm
-
-    INPUT:
-        r0 - initial position vector [km]
-        rf - final position vector [km]
-        dt - time of flight [sec]
-        DM - direction of motion
-                 0 - calculate DM based on the assumption that 
-                     both orbits are in the equatorial plane
-                +1 - short way
-                -1 - long way
-        type - type I, II, III, IV, V, VI, etc...
-        mu - gravitational parameter of central body (default is sun) 
-             [km^3/s^2]
-
-    OUTPUT:
-        v0 - velocity at r0 [km/s]
-        vf - velocity at fr [k/s]
-        psi_n - value of psi converged
-        revs - number of revolutions
-        
-    NOTES:
-        Algorithm is a bit slow. Could lower tolerances and feed 
-        psi_bound in manually to speed up.
+def BdTBdR(r, v, mu=c.mu_earth):
+    """This function calculates the B-Plane coordinates of a spacecraft
+    on the sphere of influence of a body.
     """
 
-    # Tolerances
-    tol_psi = 1e-6
-    tol_dt = 1e-6
+    # V_inf
+    r_mag = np.sqrt(r.dot(r))
+    v_mag = np.sqrt(v.dot(v))
 
-    # Function Checks
-    true = True
-    check_dt = 0
-    check_traj = 0
-    check_type = 0
+    # Computing Nominal B-Plane Components
+    # semi-major axis
+    a = -mu/v_mag/v_mag
 
-    # Check Transfer Time
-    if dt < 0:
-        print('ERROR: Transfer Time is Negative')
-        check_dt = 1
+    # Angular Momentum
+    h_vec = np.cross(r, v)
+    h_hat = h_vec/np.sqrt(h_vec.dot(h_vec))
 
-    # Calculating direction of motion
-    if DM == 1:
-        # Short way
-        orb_type = 1
+    # Eccentricity vector
+    e_vec = ((v_mag*v_mag - mu/r_mag)*r - np.dot(r, v)*v)/mu
+    e_mag = np.sqrt(e_vec.dot(e_vec))
 
-    elif DM == -1:
-        # Long way
-        orb_type = 2
+    # semi-minor axis
+    b = abs(a)*np.sqrt(e_mag*e_mag - 1)
 
-    else:
-        # This only works if both orbits are mostly in the xy-plane
-        # such as the case for IMD
+    # 1/2 angle
+    rho = np.arccos(1/e_mag)
 
-        # Calculating delta_nu
-        nu1 = np.arctan2(r0[1], r0[0])
-        if nu1 < 0:
-            nu1 += 2*np.pi
-    
-        nu2 = np.arctan2(rf[1], rf[0])
-        if nu2 < 0:
-            nu2 += 2*np.pi
-    
-        delta_nu = nu2 - nu1
-        if delta_nu < 0:
-            delta_nu += 2*np.pi
-    
-        # DM = Direction of Motion (+1 short way, -1 longway)
-        # Direction of motion dictated by delta_nu
-        if delta_nu > np.pi:
-            DM = -1
-            orb_type = 2
-        else:
-            DM = 1
-            orb_type = 1
+    # S_hat
+    hXe = np.cross(h_hat, e_vec)
+    S_hat = np.cos(rho)*e_vec/e_mag + np.sin(rho)*hXe/np.sqrt(hXe.dot(hXe))
 
-    # Intializing
-    r0_mag = np.sqrt(r0.dot(r0))
-    rf_mag = np.sqrt(rf.dot(rf))
-    
-    cos_delnu = np.dot(r0, rf)/abs(r0_mag*rf_mag)
-    A = DM*np.sqrt(r0_mag*rf_mag*(1.0 + cos_delnu))
+    # T_hat
+    k = np.array([0, 0, 1.0])
+    SXk = np.cross(S_hat, k)
+    T_hat = SXk/np.sqrt(SXk.dot(SXk))
 
-    c2 = 1/2.0
-    c3 = 1/6.0
+    # R_hat
+    R_hat = np.cross(S_hat, T_hat)
 
-    # Checking possibility of trajectory
-    if np.arccos(cos_delnu) == 0 or A == 0:
-        print('ERROR: Trajectories cannot be computed')
-        check_traj = 1
+    # B_hat
+    B_hat = np.cross(S_hat, h_hat)
+    B_vec = b*B_hat
 
-    # Determining Revs
-    if type <= 2:
-        revs = 0
-    else:
-        revs = np.floor((type - 1)/2.0)
+    BdT = np.dot(B_vec, T_hat)
+    BdR = np.dot(B_vec, R_hat)
 
-    if revs == 0:
-        psi_high = 4*np.pi*np.pi
-        psi_low = -4*np.pi
-        psi_n = 0
-    
-    else:
-        psi_h = 4*((revs + 1)*np.pi)**2
-        psi_l = 4*(revs*np.pi)**2
-        
-        # Need to find the minimum value of Psi
-        psi_test = np.linspace(psi_l+1e-3, psi_h-1e-3, 1e3)
-        TOF_test = []
-        
-        for psi in psi_test:
-            a = 1
-            # Finding c2, c3
-            if psi > tol_psi:
-                c2_test = (1.0 - np.cos(np.sqrt(psi)))/psi
-                c3_test = ((np.sqrt(psi) - 
-                    np.sin(np.sqrt(psi)))/np.sqrt(psi**3.0))
-            elif psi < -tol_psi:
-                c2_test = (1.0 - np.cosh(np.sqrt(-psi)))/psi
-                c3_test = ((np.sinh(np.sqrt(-psi)) - 
-                    np.sqrt(-psi))/np.sqrt((-psi)**3.0))
-            else:
-                c2_test = 1/2.0
-                c3_test = 1/6.0
-            
-            y_test = (r0_mag + rf_mag + 
-                A*(psi*c3_test - 1.0)/np.sqrt(c2_test))
-            Xi_test = np.sqrt(y_test/c2_test)
-            TOF_test.append(((Xi_test**3.0)*c3_test + 
-                A*np.sqrt(y_test))/np.sqrt(mu))
-
-        TOF_min = min(TOF_test)
-        index = TOF_test.index(TOF_min)
-        psi_bound = psi_test[index]
-
-        if type % 2 == 0: # even type, positive slope
-            psi_high = 4*((revs + 1)*np.pi)**2
-            psi_low = psi_bound
-        elif type % 2 == 1: # odd type, negative slope
-            psi_high = psi_bound
-            psi_low = 4*(revs*np.pi)**2
-        else:
-            print('ERROR: Type not defined well')
-            check_type = 1
-
-        psi_n = (psi_high + psi_low)/2.0
-    
-    if check_dt == 0 and check_traj == 0 and check_type == 0:
-        loop_count = 0
-        
-        while true:
-            loop_count += 1
-    
-            if loop_count == 1000:
-                # print 'WARNING: Tolerance increased to 1e-5'
-                tol_dt = 1e-5
-            elif loop_count == 10000:
-                # print 'WARNING: Tolerance increased to 1e-4'
-                tol_dt = 1e-4
-            elif loop_count == 30000:
-                # print 'WARNING: Tolerance increased to 1e-3'
-                tol_dt = 1e-3
-            elif loop_count == 60000:
-                # print 'WARNING: Tolerance increased to 1e-2'
-                tol_dt = 1e-2
-            elif loop_count == 100000:
-                print('ERROR: No Convergence for TOF')
-                v0 = np.float('NaN')
-                vf = np.float('NaN')
-                psi_n = np.float('NaN')
-                break
-    
-            y = r0_mag + rf_mag + A*(psi_n*c3 - 1.0)/np.sqrt(c2)
-    
-            # readjusting psi_low until y > 0
-            if A > 0 and y < 0:
-                while y < 0:
-                    psi_n += 0.1
-                    y = (r0_mag + rf_mag + 
-                        A*(psi_n*c3 - 1.0)/np.sqrt(c2))
-    
-            Xi = np.sqrt(y/c2)
-            dt_n = ((Xi**3.0)*c3 + A*np.sqrt(y))/np.sqrt(mu)
-    
-            if type % 2 == 0 or revs == 0: # even type, positive slope
-                if dt_n <= dt: 
-                    psi_low = psi_n
-                else:
-                    psi_high = psi_n
-            elif type % 2 == 1:  # odd type, negative slope:
-                if dt_n >= dt: 
-                    psi_low = psi_n
-                else:
-                    psi_high = psi_n
-            
-            psi_n = (psi_low + psi_high)/2.0
-
-            if psi_n > tol_psi:
-                c2 = (1.0 - np.cos(np.sqrt(psi_n)))/psi_n
-                c3 = ((np.sqrt(psi_n) - 
-                    np.sin(np.sqrt(psi_n)))/np.sqrt(psi_n**3.0))
-            elif psi_n < -tol_psi:
-                c2 = (1.0 - np.cosh(np.sqrt(-psi_n)))/psi_n
-                c3 = ((np.sinh(np.sqrt(-psi_n)) - 
-                    np.sqrt(-psi_n))/np.sqrt((-psi_n)**3.0))
-            else:
-                c2 = 1/2.0
-                c3 = 1/6.0
-    
-            if abs(dt_n - dt) < tol_dt:
-                break
-    
-        f = 1.0 - y/r0_mag
-        gdot = 1.0 - y/rf_mag
-        g = A*np.sqrt(y/mu)
-    
-        v0 = (rf - f*r0)/g
-        vf = (gdot*rf - r0)/g
-
-    else:
-        print("Lambert did not work")
-        v0 = float('NaN')
-        vf = float('NaN')
-        psi_n = float('NaN')
-
-    return v0, vf, psi_n, revs
+    return BdT, BdR
 # =====================================================================
+

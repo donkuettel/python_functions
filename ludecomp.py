@@ -208,10 +208,10 @@ def LUdcmp_msolve(a, b):
     
     INPUT:
         a - (n,n) matrix (np.array)
-        b - (n,n) vector (np.array)
+        b - (n,n) matrix (np.array)
     
     OUPUT:
-        x - (n,n) solution vector (np.array)
+        x - (n,n) solution matrix (np.array)
     """ 
 
     # Checking that function will work

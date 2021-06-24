@@ -7406,23 +7406,28 @@ def twobod_contol_grav_srp_thirdbod_equ(X, t, constants):
     u = constants['u']
 
     # Assigning Constants
-    mu_host = constants['mu']
-    mu_3B = constants['mu_3B']
-    d_3B = constants['d_3B']
-    R_3B = constants['R_3B']
-    R = constants['R']
-    Cr = constants['Cr']
-    srp_flux = constants['srp_flux']
-    a2m = constants['a2m']
-    degree = constants['degree']
-    order = constants['order']
-    theta_gst = constants['theta_gst']
-    w_body = constants['w_body']
-    gc = constants['gc']
-    C = gc['C_lm']
-    S = gc['S_lm']
-    isp = constants['isp']
-    g = constants['g']
+    mu_host = constants['mu']               # m3/s2
+    mu_3B = constants['mu_3B']              # m3/s2
+    d_3B = constants['d_3B']                # m
+    R_3B = constants['R_3B']                # m
+    R = constants['R']                      # m
+    Cr = constants['Cr']                    # -
+    srp_flux = constants['srp_flux']        # W/m2 J/s/m2 kg/s3
+    a2m = constants['a2m']                  # m2/kg
+    degree = constants['degree']            # -
+    order = constants['order']              # -
+    theta_gst = constants['theta_gst']      # rad
+    w_body = constants['w_body']            # rad/s
+    gc = constants['gc']                    # -
+    C = gc['C_lm']                          # -
+    S = gc['S_lm']                          # -
+    isp = constants['isp']                  # s
+    g = constants['g']                      # m/s2
+    # c                                     # m/s
+    # AU                                    # m
+    # Cr * a2m * flux/c                     # m/s2
+
+    srp_const = Cr*a2m*srp_flux/c.c*c.AU*c.AU/1000.0
 
     # Orbital Elements
     p = X[0]
@@ -7545,8 +7550,7 @@ def twobod_contol_grav_srp_thirdbod_equ(X, t, constants):
         if r_mag < R:
             print('ERROR: The SC is inside the central body!!')
 
-    srp_const = l*Cr*a2m*srp_flux/c.c*c.AU*c.AU/1000.0
-    a_srp = srp_const/r_sun2sc_mag/r_sun2sc_mag/r_sun2sc_mag*r_sun2sc
+    a_srp = l*srp_const/r_sun2sc_mag/r_sun2sc_mag/r_sun2sc_mag*r_sun2sc
 
     # Third-body from Sun
     r_host2sun = d_3B*np.array([-1, 0, 0])

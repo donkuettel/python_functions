@@ -29,7 +29,7 @@ def CoordTrans(frame1, frame2, original_vec, oe=np.zeros(6),
     FRAMES:
         BCI  - Body-Centered Inertial
         BCBF - Body-Centered Body-Fixed
-        RSW  - Satellite Radial
+        RIC  - Satellite Radial
         NTW  - Satellite Normal
         PQW  - Perifocal 
         LLA  - geocentric Lat, Lon, Altitude
@@ -49,7 +49,7 @@ def CoordTrans(frame1, frame2, original_vec, oe=np.zeros(6),
     a, e, inc, raan, w, nu = oe
 
     # Warnings
-    oe_frames = ['rsw', 'ntw', 'pqw']
+    oe_frames = ['ric', 'ntw', 'pqw']
     if any(frame in oe_frames for frame in (frame1, frame2)):
         if oe.dot(oe) == 0:
             print('ERROR: You forgot to define the orbital elements!')
@@ -66,8 +66,8 @@ def CoordTrans(frame1, frame2, original_vec, oe=np.zeros(6),
             if np.isnan(theta_gst):
                 print('ERROR: You forgot to define theta_gst!')
     
-        elif frame2.lower() == 'rsw':
-            rotated_vec = bci2rsw(original_vec, raan, inc, w, nu)
+        elif frame2.lower() == 'ric':
+            rotated_vec = bci2ric(original_vec, raan, inc, w, nu)
     
         elif frame2.lower() == 'ntw':
             rotated_vec = bci2ntw(original_vec, e, raan, inc, w, nu)
@@ -96,9 +96,9 @@ def CoordTrans(frame1, frame2, original_vec, oe=np.zeros(6),
             if np.isnan(theta_gst):
                 print('ERROR: You forgot to define theta_gst!')
     
-        elif frame2.lower() == 'rsw':
+        elif frame2.lower() == 'ric':
             rotated_vec1 = bcbf2bci(original_vec, theta_gst)
-            rotated_vec = bci2rsw(rotated_vec1, raan, inc, w, nu)
+            rotated_vec = bci2ric(rotated_vec1, raan, inc, w, nu)
             if np.isnan(theta_gst):
                 print('ERROR: You forgot to define theta_gst!')
     
@@ -123,8 +123,8 @@ def CoordTrans(frame1, frame2, original_vec, oe=np.zeros(6),
         else:
             print('ERROR: Frame2 is not included in this function!')
 
-    elif frame1.lower() == 'rsw':
-        rotated_vec1 = rsw2bci(original_vec, raan, inc, w, nu)
+    elif frame1.lower() == 'ric':
+        rotated_vec1 = ric2bci(original_vec, raan, inc, w, nu)
         if frame2.lower() == 'bcbf':
             rotated_vec = bci2bcbf(rotated_vec1, theta_gst)
             if np.isnan(theta_gst):
@@ -161,8 +161,8 @@ def CoordTrans(frame1, frame2, original_vec, oe=np.zeros(6),
             if np.isnan(theta_gst):
                 print('ERROR: You forgot to define theta_gst!')
     
-        elif frame2.lower() == 'rsw':
-            rotated_vec = bci2rsw(rotated_vec1, raan, inc, w, nu)
+        elif frame2.lower() == 'ric':
+            rotated_vec = bci2ric(rotated_vec1, raan, inc, w, nu)
     
         elif frame2.lower() == 'bci':
             rotated_vec = rotated_vec1
@@ -192,8 +192,8 @@ def CoordTrans(frame1, frame2, original_vec, oe=np.zeros(6),
             if np.isnan(theta_gst):
                 print('ERROR: You forgot to define theta_gst!')
     
-        elif frame2.lower() == 'rsw':
-            rotated_vec = bci2rsw(rotated_vec1, raan, inc, w, nu)
+        elif frame2.lower() == 'ric':
+            rotated_vec = bci2ric(rotated_vec1, raan, inc, w, nu)
     
         elif frame2.lower() == 'ntw':
             rotated_vec = bci2ntw(rotated_vec1, e, raan, inc, w, nu)
@@ -221,9 +221,9 @@ def CoordTrans(frame1, frame2, original_vec, oe=np.zeros(6),
         if frame2.lower() == 'bcbf':
             rotated_vec = rotated_vec1
     
-        elif frame2.lower() == 'rsw':
+        elif frame2.lower() == 'ric':
             rotated_vec2 = bcbf2bci(rotated_vec1, theta_gst)
-            rotated_vec = bci2rsw(rotated_vec2, raan, inc, w, nu)
+            rotated_vec = bci2ric(rotated_vec2, raan, inc, w, nu)
             if np.isnan(theta_gst):
                 print('ERROR: You forgot to define theta_gst!')
     
@@ -259,8 +259,8 @@ def CoordTrans(frame1, frame2, original_vec, oe=np.zeros(6),
         if frame2.lower() == 'bcbf':
             rotated_vec = rotated_vec1
     
-        elif frame2.lower() == 'rsw':
-            rotated_vec = bci2rsw(rotated_vec2, raan, inc, w, nu)
+        elif frame2.lower() == 'ric':
+            rotated_vec = bci2ric(rotated_vec2, raan, inc, w, nu)
     
         elif frame2.lower() == 'ntw':
             rotated_vec = bci2ntw(rotated_vec2, e, raan, inc, w, nu)
@@ -293,8 +293,8 @@ def CoordTrans(frame1, frame2, original_vec, oe=np.zeros(6),
     3) R3       - Rotation about z-axis
     4) bcbf2bci - Rotating from BCBF to BCI
     5) bci2bcbf - Rotating from BCI to BCBF
-    6) rsw2bci  - Rotating from Satellite Radial (RSW) to BCI
-    7) bci2rsw  - Rotating from BCI to Satellite Radial (RSW)
+    6) ric2bci  - Rotating from Satellite Radial (RIC) to BCI
+    7) bci2ric  - Rotating from BCI to Satellite Radial (RIC)
     7) ntw2bci  - Rotating from Satellite Normal (NTW) to BCI
     9) bci2ntw  - Rotating from BCI to Satellite Normal (NTW)
    10) lla2bcbf - Rotating from lat, lon, alt (LLA) to BCBF
@@ -382,12 +382,12 @@ def bcbf2bci(bcbf_vec, theta_gst):
     - BCI and BCBF coordinate frames share a common z-axis
 
     INPUT:
-        bcbf_vec - a 3xN matrix of vectors in the BCBF frame
+        bcbf_vec - a Nx3 matrix of vectors in the BCBF frame
         theta_gst - the angle between the BCBF and BCI coordinate 
                     systems in [rads]
 
     OUTPUT:
-        bci_vec - a 3xN matrix of vectors in BCI coordinates
+        bci_vec - a Nx3 matrix of vectors in BCI coordinates
     """
 
     bci_vec = R3(-theta_gst) @ bcbf_vec
@@ -409,12 +409,12 @@ def bci2bcbf(bci_vec, theta_gst):
     - BCI and BCBF coordinate frames share a common z-axis
 
     INPUT:
-        bci_vec - a 3xN matrix or vectors in the BCI frame
+        bci_vec - a Nx3 matrix or vectors in the BCI frame
         theta_gst - the angle between the BCBF and BCI coordinate 
                     systems in [rads]
 
     OUTPUT:
-        bcbf_vec - a 3xN matrix of vectors in BCBF coordinates
+        bcbf_vec - a Nx3 matrix of vectors in BCBF coordinates
     """
 
     bcbf_vec = R3(theta_gst) @ bci_vec
@@ -425,23 +425,23 @@ def bci2bcbf(bci_vec, theta_gst):
 
 # ===================================================================
 # 6) 
-def rsw2bci(rsw_vec, raan, inc, w, nu):
+def ric2bci(ric_vec, raan, inc, w, nu):
     """This function takes a 3xN matrix of vectors in Satellite 
-    Radial (RSW) coordinates and rotates it to Body-Centered 
+    Radial (RIC) coordinates and rotates it to Body-Centered 
     Inertial (BCI) coordinates.
     
     ASSUMPTIONS:
     - all angles in radians
 
     INPUT:
-        rsw_vec - a 3xN matrix of vectors in the RSW frame
+        ric_vec - a Nx3 matrix of vectors in the RIC frame
         raan - right ascencion of the ascending node in [rad]
         inc - inclination of the orbit in [rad]
         w - argument of periapsis in [rad]
         nu - true anomaly in [rad]
 
     OUTPUT:
-        bci_vec - a 3xN matrix of vectors in the BCI frame
+        bci_vec - a Nx3 matrix of vectors in the BCI frame
     """
 
     # Checking for special orbit cases
@@ -453,7 +453,7 @@ def rsw2bci(rsw_vec, raan, inc, w, nu):
     # Argument of Latitude
     u = w + nu
 
-    bci_vec = R3(-raan) @ R1(-inc) @ R3(-u) @ rsw_vec
+    bci_vec = R3(-raan) @ R1(-inc) @ R3(-u) @ ric_vec
 
     return bci_vec
 
@@ -462,23 +462,23 @@ def rsw2bci(rsw_vec, raan, inc, w, nu):
 
 # ===================================================================
 # 7)
-def bci2rsw(bci_vec, raan, inc, w, nu):
+def bci2ric(bci_vec, raan, inc, w, nu):
     """This function converts a 3xN matrix of vectors in the
     Body-Centered Inertial (BCI) frame and rotates it to the 
-    Satellite Radial (RSW) frame.
+    Satellite Radial (RIC) frame.
     
     ASSUMPTIONS:
     - all angles in radians
 
     INPUT:
-        bci_vec - a 3xN matrix of vectors in the BCI frame
+        bci_vec - a Nx3 matrix of vectors in the BCI frame
         raan - right ascencion of the ascending node in [rad]
         inc - inclination of the orbit in [rad]
         w - argument of periapsis in [rad]
         nu - true anomaly in [rad]
 
     OUTPUT:
-        rsw_vec - a 3xN matrix of vectors in the BCI frame
+        ric_vec - a Nx3 matrix of vectors in the BCI frame
     """
 
     # Checking for special orbit cases
@@ -490,9 +490,9 @@ def bci2rsw(bci_vec, raan, inc, w, nu):
     # Argument of Latitude
     u = w + nu
 
-    rsw_vec = R3(u) @ R1(inc) @ R3(raan) @ bci_vec
+    ric_vec = R3(u) @ R1(inc) @ R3(raan) @ bci_vec
 
-    return rsw_vec
+    return ric_vec
 
 # ===================================================================
 
@@ -508,7 +508,7 @@ def ntw2bci(ntw_vec, e, raan, inc, w, nu):
     - all angles in radians
 
     INPUT:
-        ntw_vec - a 3xN matrix of vectors in the NTW frame
+        ntw_vec - a Nx3 matrix of vectors in the NTW frame
         e - eccentricity
         raan - right ascencion of the ascending node in [rad]
         inc - inclination of the orbit in [rad]
@@ -516,7 +516,7 @@ def ntw2bci(ntw_vec, e, raan, inc, w, nu):
         nu - true anomaly in [rad]
 
     OUTPUT:
-        bci_vec - a 3xN matrix of vectors in the BCI frame
+        bci_vec - a Nx3 matrix of vectors in the BCI frame
     """
 
     # Checking for special orbit cases
@@ -549,7 +549,7 @@ def bci2ntw(bci_vec, e, raan, inc, w, nu):
     - all angles in radians
 
     INPUT:
-        bci_vec - a 3xN matrix of vectors in the BCI frame
+        bci_vec - a Nx3 matrix of vectors in the BCI frame
         e - eccentricity
         raan - right ascencion of the ascending node in [rad]
         inc - inclination of the orbit in [rad]
@@ -557,7 +557,7 @@ def bci2ntw(bci_vec, e, raan, inc, w, nu):
         nu - true anomaly in [rad]
 
     OUTPUT:
-        ntw_vec - a 3xN matrix of vectors in the NTW frame
+        ntw_vec - a Nx3 matrix of vectors in the NTW frame
     """
 
     # Checking for special orbit cases
@@ -591,7 +591,7 @@ def lla2bcbf(lla, r_body=c.r_earth):
     - all angles in radians
 
     INPUT:
-        lla - a 3xN matrix of vectors with: 
+        lla - a Nx3 matrix of vectors with: 
             lat - geocentric latitude in [rad]
             lon - the longitude in [rad]
             alt - the altitude from sea-level in [km]
@@ -599,7 +599,7 @@ def lla2bcbf(lla, r_body=c.r_earth):
                   in [km]
 
     OUTPUT:
-        bcbf_vec - a 3xN matrix of position vectors in the 
+        bcbf_vec - a Nx3 matrix of position vectors in the 
                    BCBF frame in [km]
     """
 
@@ -607,13 +607,13 @@ def lla2bcbf(lla, r_body=c.r_earth):
     try:
         bcbf_vec = np.zeros(lla.shape)
     
-        for i in range(lla.shape[1]):
-            lat = lla[0,i]
-            lon = lla[1,i]
-            alt = lla[2,i]
+        for i in range(lla.shape[0]):
+            lat = lla[i,0]
+            lon = lla[i,1]
+            alt = lla[i,2]
     
             # ECEF Position of the surface location
-            bcbf_vec[:,i] = np.array(
+            bcbf_vec[i,:] = np.array(
                 [(alt + r_body)*np.cos(lat)*np.cos(lon),
                 (alt + r_body)*np.cos(lat)*np.sin(lon),
                 (alt + r_body)*np.sin(lat)])
@@ -647,11 +647,11 @@ def bcbf2lla(bcbf_vec, r_body=c.r_earth):
 
     INPUT:
         r_body - radius of host body (assumed to be Earth) in [km]
-        bcbf_vec - a 3xN matrix of position vectors in the 
+        bcbf_vec - a Nx3 matrix of position vectors in the 
                    BCBF frame in [km]
 
     OUTPUT:
-        lla - a 3xN matrix of vectors with: 
+        lla - a Nx3 matrix of vectors with: 
             lat - geocentric latitude in [rad]
             lon - the longitude in [rad]
             alt - the altitude from sea-level in [km]
@@ -660,23 +660,23 @@ def bcbf2lla(bcbf_vec, r_body=c.r_earth):
     # 3xN BCBF Position Matrix
     try:
         lla = np.zeros(bcbf_vec.shape)
-
-        for i in range(bcbf_vec.shape[1]):
-            x = bcbf_vec[0,i]
-            y = bcbf_vec[1,i]
-            z = bcbf_vec[2,i]
+    
+        for i in range(bcbf_vec.shape[0]):
+            x = bcbf_vec[i,0]
+            y = bcbf_vec[i,1]
+            z = bcbf_vec[i,2]
             r_mag = np.sqrt(x*x + y*y + z*z)
-
+    
             # lla
             lat = np.arcsin(z/r_mag)
-            
+                   
             lon = np.arctan2(y, x)
-            if lon < 0:
-                lon += 2*np.pi
-            
+            # if lon < 0:
+            #     lon += 2*np.pi
+                   
             alt = r_mag - r_body
-
-            lla[:,i] = np.array([lat, lon, alt])
+    
+            lla[i,:] = np.array([lat, lon, alt])
 
     # 3x1 BCBF Position Vector
     except:
@@ -689,8 +689,8 @@ def bcbf2lla(bcbf_vec, r_body=c.r_earth):
         lat = np.arcsin(z/r_mag)
         
         lon = np.arctan2(y, x)
-        if lon < 0:
-            lon += 2*np.pi
+        # if lon < 0:
+        #     lon += 2*np.pi
         
         alt = r_mag - r_body
         lla = np.array([lat, lon, alt])
@@ -710,14 +710,14 @@ def pqw2bci(pqw_vec, raan, inc, w):
     - all angles in radians
 
     INPUT:
-        rsw_vec - a 3xN matrix of vectors in the RSW frame
+        ric_vec - a Nx3 matrix of vectors in the RIC frame
         raan - right ascencion of the ascending node in [rad]
         inc - inclination of the orbit in [rad]
         w - argument of periapsis in [rad]
         nu - true anomaly in [rad]
 
     OUTPUT:
-        bci_vec - a 3xN matrix of vectors in the BCI frame
+        bci_vec - a Nx3 matrix of vectors in the BCI frame
     """
 
     # Checking for special orbit cases
@@ -745,14 +745,14 @@ def bci2pqw(bci_vec, raan, inc, w):
     - all angles in radians
 
     INPUT:
-        bci_vec - a 3xN matrix of vectors in the BCI frame    
+        bci_vec - a Nx3 matrix of vectors in the BCI frame    
         raan - right ascencion of the ascending node in [rad]
         inc - inclination of the orbit in [rad]
         w - argument of periapsis in [rad]
         nu - true anomaly in [rad]
 
     OUTPUT:
-        rsw_vec - a 3xN matrix of vectors in the RSW frame
+        ric_vec - a Nx3 matrix of vectors in the RIC frame
     """
 
     # Checking for special orbit cases
@@ -783,14 +783,14 @@ def sez2bcbf(razel, lla, r_body=c.r_earth):
     - razel and lla are the same size
 
     INPUT:
-        razel - a 3xN matrix of vectors with:
+        razel - a Nx3 matrix of vectors with:
             rng - the distance of the spacecraft from the ground 
                   location in [km]
             az  - the azimuth of the spacecraft wrt the ground 
             location in [rad]
             el -  elevation angle of the spacecraft wrt the ground 
                   location in [rad]         
-        lla - a 3xN matrix of vectors with: 
+        lla - a Nx3 matrix of vectors with: 
             lat - geocentric latitude in [rad]
             lon - the longitude in [rad]
             alt - the altitude from sea-level in [km]
@@ -798,7 +798,7 @@ def sez2bcbf(razel, lla, r_body=c.r_earth):
                   in [km]
 
     OUTPUT:
-        bcbf_vec - a 3xN matrix of position vectors in the BCBF 
+        bcbf_vec - a Nx3 matrix of position vectors in the BCBF 
                    frame in [km]
     """
 
@@ -809,10 +809,10 @@ def sez2bcbf(razel, lla, r_body=c.r_earth):
     try:
         bcbf_vec = np.zeros(razel.shape)
 
-        for i in range(razel.shape[1]):
-            rng = razel[0,i]
-            az = razel[1,i]
-            el = razel[2,i]
+        for i in range(razel.shape[0]):
+            rng = razel[i,0]
+            az = razel[i,1]
+            el = razel[i,2]
 
             # SEZ range vector of the spacecraft
             p_sez = np.array([-rng*np.cos(el)*np.cos(az),
@@ -823,7 +823,7 @@ def sez2bcbf(razel, lla, r_body=c.r_earth):
             p_bcbf = R3(-lon) @ R2(lat - np.pi/2.0) @ p_sez
         
             # Final BCBF position vector
-            bcbf_vec[:,i] = p_bcbf + bcbf_ground_pos[:,i]
+            bcbf_vec[i,:] = p_bcbf + bcbf_ground_pos[:,i]
 
     # 3x1 razel vector
     except:
@@ -862,9 +862,9 @@ def bcbf2sez(bcbf_vec, lla, r_body=c.r_earth):
     - bcbf_vec and lla are the same size
 
     INPUT:
-        bcbf_vec - a 3xN matrix of position vectors in the BCBF 
+        bcbf_vec - a Nx3 matrix of position vectors in the BCBF 
                    frame in [km]
-        lla - a 3xN matrix of vectors with: 
+        lla - a Nx3 matrix of vectors with: 
             lat - geocentric latitude in [rad]
             lon - the longitude in [rad]
             alt - the altitude from sea-level in [km]
@@ -872,7 +872,7 @@ def bcbf2sez(bcbf_vec, lla, r_body=c.r_earth):
                   in [km]
 
     OUTPUT:
-        razel - a 3xN matrix of vectors with:
+        razel - a Nx3 matrix of vectors with:
             rng - the distance of the spacecraft from the ground 
                   location in [km]
             az  - the azimuth of the spacecraft wrt the ground 
@@ -888,9 +888,9 @@ def bcbf2sez(bcbf_vec, lla, r_body=c.r_earth):
     try:
         razel = np.zeros(bcbf_vec.shape)
 
-        for i in range(bcbf_vec.shape[1]):
+        for i in range(bcbf_vec.shape[0]):
             # BCBF range = spacecraft positon - ground position
-            p_bcbf = bcbf_vec[:,i] - bcbf_ground_pos[:,i]
+            p_bcbf = bcbf_vec[i,:] - bcbf_ground_pos[i,:]
 
             # Now we rotate BCBF into SEZ
             p_sez = R2(np.pi/2 - lat) @ R3(lon) @ p_bcbf
@@ -904,10 +904,10 @@ def bcbf2sez(bcbf_vec, lla, r_body=c.r_earth):
             cos_az = -p_sez[0]/np.sqrt(p_sez[0]**2 + p_sez[1]**2)
             sin_az = p_sez[1]/np.sqrt(p_sez[0]**2 + p_sez[1]**2)
             az = np.arctan2(sin_az, cos_az)
-            if az < 0:
-                az += 2*np.pi
+            # if az < 0:
+            #     az += 2*np.pi
 
-            razel[:,i] = np.array([rng, az, el])
+            razel[i,:] = np.array([rng, az, el])
 
     # 3x1 bcbf_vec vector
     except:
@@ -926,8 +926,8 @@ def bcbf2sez(bcbf_vec, lla, r_body=c.r_earth):
         cos_az = -p_sez[0]/np.sqrt(p_sez[0]**2 + p_sez[1]**2)
         sin_az = p_sez[1]/np.sqrt(p_sez[0]**2 + p_sez[1]**2)
         az = np.arctan2(sin_az, cos_az)
-        if az < 0:
-            az += 2*np.pi
+        # if az < 0:
+        #     az += 2*np.pi
 
         razel = np.array([rng, az, el])
 

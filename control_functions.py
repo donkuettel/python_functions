@@ -113,8 +113,8 @@ def lambert_control(r_sc, v_sc, r_t, v_t, t_trans, a_t, DM=1,
 
     # Angle between current position and desired position
     r_sc_mag = np.sqrt(r_sc.dot(r_sc))
-    r_dest_mag = np.sqrt(r_dest.dot(r_dest))
-    cos_ang = np.dot(r_sc, r_dest)/r_sc_mag/r_dest_mag
+    r_t_mag = np.sqrt(r_t.dot(r_t))
+    cos_ang = np.dot(r_sc, r_t)/r_sc_mag/r_t_mag
 
     # If this angle is -1 or 1 the lambert solver won't converge
     # in this scenario a Hohmann transfer is optimal (i.e., burning
@@ -126,7 +126,7 @@ def lambert_control(r_sc, v_sc, r_t, v_t, t_trans, a_t, DM=1,
 
         # hohmann transfer
         dv_a = af.hohmann(oe_sc[0], oe_dest[0], 
-            r_sc_mag, r_dest_mag, mu=mu)[2]
+            r_sc_mag, r_t_mag, mu=mu)[2]
         dv = np.array([0, dv_a, 0])
         dv_mag = dv_a
 
